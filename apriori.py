@@ -38,7 +38,7 @@ class Apriori:
                         self.freqItemset[c] += 1
             self.frequentItemsets[k] = self.prune(candidate[k], k)
             k += 1
-        print (self.frequentItemsets)
+        # print (self.frequentItemsets)
         return self.frequentItemsets
     
     def prune(self, items, k):
@@ -106,7 +106,10 @@ class Apriori:
                                 right_subset = self.difference(item, left_subset)
                                 # if len(right_subset) == 1:
                                 rules.append((left_subset, right_subset, support, confidence))
+                                
         # print(rules)
+        # df = pd.DataFrame(rules, columns=['left_subset','right_subset','support','confidence'])
+        # df.to_csv('Sample_0.2_0.5.csv', index=False)
         return rules
 
     def difference(self, item, left_subset):
@@ -114,13 +117,16 @@ class Apriori:
     
     def getConfidence(self, subsetCount, itemsetCount):
         return float(itemsetCount)/subsetCount
-        
+
 def main():
     products = defaultdict(list)
 
-    # Get Itemsets From Input Data 
+    # Get Transactions From Input Data 
 
     inputData = pd.read_csv('./inputData/sampleOrderData.csv')
+    # inputData = pd.read_csv('./inputData/order_products__prior.csv')  # 1804 transaction
+    # inputData = pd.read_csv('./inputData/order_products__prior2000.csv')
+    # inputData = pd.read_csv('./inputData/order_products__prior5000.csv')  # 8860 transaction
 
     transactions = inputData.groupby('order_id')['product_id'].apply(list).to_dict()
     reorderedTransactions = inputData.loc[inputData['reordered'] == 1].groupby('order_id')['product_id'].apply(list).to_dict()
@@ -128,30 +134,128 @@ def main():
     itemsets = list(transactions.values())
     reorderedItemset = list(reorderedTransactions.values())
 
-    # Get Unique Itemsets
-
-    # uniqueItemset = []
-
-    # for reorderedItem in reorderedItemset :
-    #     if reorderedItem not in itemsets :
-    #         itemsets.append(reorderedItem)
-
-    # for itemset in itemsets :
-    #     if itemset not in uniqueItemset :
-    #         uniqueItemset.append(itemset)
-    
-    # itemsets = uniqueItemset
-
     for reorderedItem in reorderedItemset :
             itemsets.append(reorderedItem)
     
+    print(itemsets)
+    
     productsData = pd.read_csv('./inputData/sampleProductData.csv')
+    # productsData = pd.read_csv('./inputData/products.csv')
+
     products = productsData['product_id'].tolist()
 
-    apriori = Apriori(itemsets, products, 0.2, 0.27)
+    apriori = Apriori(itemsets, products, 0.2, 0.5)
     frequentItemsets = apriori.getFrequentItemsets()
-    a.genRules(frequentItemsets)
+    apriori.genRules(frequentItemsets)
 
+'''
+API getRule return all rules
+Read Result CSV File
+left_subset, right_subset, support, confidence
+Output format:
+result
+{file: str,
+minSup: ,
+minconfi 
+rules: [
+    {
+        leftItemset: ['A','B'],
+        rightItemset: ['A','B'],
+        support: a,
+        confidence: b
+
+    },
+    {
+
+    }
+]}
+
+'''
+
+def getProductName(productIds, products):
+    productName = []
+    productIds = productIds.strip('(),').split(',') 
+    newProductIds = []
+
+    for productId in productIds:
+        newProductIds.append(int(productId))
+
+    for newProductId in newProductIds:
+        productName.append(products[newProductId])
+
+    return productName
+
+def getRules(outputFile, productFile, minSupp, minConf):
+    products = defaultdict(list)
+    result = {}
+    items = []
+
+    outputData = pd.read_csv(outputFile).apply(list).to_dict('records')
+    productsData = pd.read_csv(productFile).apply(list).to_dict('records')
+
+    for item in productsData:
+        products[item['product_id']] = item['product_name']
+
+    for item in outputData:
+        items.append({
+            'left': getProductName(item['left_subset'], products),
+            'right': getProductName(item['right_subset'], products),
+            'support': item['support'],
+            'confidence' : item['confidence']
+        })
+
+    result['outputFile'] = outputFile
+    result['minSupp'] = minSupp
+    result['minConf'] = minConf
+    result['items'] = items
+
+    print(result)
+    return result
+
+def getDemoProducts():
+    transactions = []
+    products = []
+    inputData = pd.read_csv('./inputData/demoDataSet.csv',names=['transactions'],header=None)
+    transactions = list(inputData["transactions"].apply(lambda x:x.split(',')))
+    for item in transactions:
+        products += item
+    products = list(set(products))
+    return products
+
+def processDemoData(minSupp, minConf):
+    #PreProcess
+
+    transactions = []
+    products = []
+    inputData = pd.read_csv('./inputData/demoDataSet.csv',names=['transactions'],header=None)
+    transactions = list(inputData["transactions"].apply(lambda x:x.split(',')))
+    for item in transactions:
+        products += item
+    products = set(products)
+
+    # Gen Rule Use Apriori Algorithm
+    result = {}
+    items = []
+    apriori = Apriori(transactions, products, minSupp, minConf)
+    frequentItemsets = apriori.getFrequentItemsets()
+    rules = apriori.genRules(frequentItemsets)
+    for item in rules:
+        items.append({
+            'left': list(item[0]),
+            'right': list(item[1]),
+            'support': item[2],
+            'confidence' : item[3]
+        })
+    result['minSupp'] = minSupp
+    result['minConf'] = minConf
+    result['items'] = items
+    print(result)
+    return result
 
 if __name__ == '__main__':
-    main()
+    processDemoData(0.2, 0.5)
+
+    # main()
+    # getRules('outputData/1000Tran_0.01_0.3.csv','inputData/products.csv')
+    # getRules('outputData/2000Tran_0.01_0.3.csv','inputData/products.csv')
+    # getRules('outputData/5000Tran_0.01_0.3.csv','inputData/products.csv')

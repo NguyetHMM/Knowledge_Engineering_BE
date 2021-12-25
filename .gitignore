@@ -1,2 +1,4 @@
-inputData/order_products__prior.csv
-inputData/products.csv
+inputData/order_products__prior1000.csv
+inputData/order_products__prior2000.csv
+inputData/order_products__prior5000.csv
+__pycache__
